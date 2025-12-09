@@ -3,15 +3,67 @@ from fastapi.responses import JSONResponse
 from typing import Optional
 import json
 from datetime import datetime, UTC
+from pathlib import Path
 
 app = FastAPI(title="Terraform State Backend Stub")
+
+# File paths for persistent storage
+STATE_FILE = Path("terraform_state.json")
+LOCK_FILE = Path("terraform_lock.json")
 
 # In-memory state storage
 state_store: Optional[dict] = None
 lock_info: Optional[dict] = None
 
 
-@app.get("/")
+def load_state():
+    """Load state from file if it exists."""
+    global state_store
+    if STATE_FILE.exists():
+        try:
+            with open(STATE_FILE, 'r') as f:
+                state_store = json.load(f)
+        except (json.JSONDecodeError, IOError):
+            state_store = None
+
+
+def save_state():
+    """Save state to file."""
+    if state_store is None:
+        if STATE_FILE.exists():
+            STATE_FILE.unlink()
+    else:
+        with open(STATE_FILE, 'w') as f:
+            json.dump(state_store, f, indent=2)
+
+
+def load_lock():
+    """Load lock info from file if it exists."""
+    global lock_info
+    if LOCK_FILE.exists():
+        try:
+            with open(LOCK_FILE, 'r') as f:
+                lock_info = json.load(f)
+        except (json.JSONDecodeError, IOError):
+            lock_info = None
+
+
+def save_lock():
+    """Save lock info to file."""
+    if lock_info is None:
+        if LOCK_FILE.exists():
+            LOCK_FILE.unlink()
+    else:
+        with open(LOCK_FILE, 'w') as f:
+            json.dump(lock_info, f, indent=2)
+
+
+# Load existing state and lock info on startup
+load_state()
+load_lock()
+
+
+@app.get("/tfstate")
 async def get_state():
     """
     Retrieve the current Terraform state.
@@ -23,7 +75,7 @@ async def get_state():
     return JSONResponse(content=state_store)
 
 
-@app.post("/")
+@app.post("/tfstate")
 async def update_state(request: Request):
     """
     Update or create the Terraform state.
@@ -47,10 +99,11 @@ async def update_state(request: Request):
     except json.JSONDecodeError:
         raise HTTPException(status_code=400, detail="Invalid JSON")
 
+    save_state()
     return Response(status_code=200)
 
 
-@app.delete("/")
+@app.delete("/tfstate")
 async def delete_state(request: Request):
     """
     Delete the Terraform state.
@@ -68,10 +121,11 @@ async def delete_state(request: Request):
             )
 
     state_store = None
+    save_state()
     return Response(status_code=200)
 
 
-@app.api_route("/", methods=["LOCK"])
+@app.api_route("/lock", methods=["LOCK"])
 async def lock_state(request: Request):
     """
     Lock the Terraform state.
@@ -94,10 +148,11 @@ async def lock_state(request: Request):
             )
 
     lock_info = new_lock_info
+    save_lock()
     return Response(status_code=200)
 
 
-@app.api_route("/", methods=["UNLOCK"])
+@app.api_route("/lock", methods=["UNLOCK"])
 async def unlock_state(request: Request):
     """
     Unlock the Terraform state.
@@ -120,6 +175,7 @@ async def unlock_state(request: Request):
             )
 
     lock_info = None
+    save_lock()
     return Response(status_code=200)
 
 
