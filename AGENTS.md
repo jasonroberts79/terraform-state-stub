@@ -1,0 +1,1 @@
+PURPOSE: This project is an ultra-lightweight terraform backend API for use in local development environments. It should implement the Terraform backend protocol, allowing developers to manage state files locally without requiring a remote backend.

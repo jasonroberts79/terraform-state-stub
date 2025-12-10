@@ -56,7 +56,7 @@ class TestStateOperations:
             "terraform_version": "1.0.0",
             "resources": []
         }
-        response = client.post("/tfstate", json=state_data)
+        response = client.post("/state", json=state_data)
         assert response.status_code == 200
 
     def test_get_state_after_post(self):
@@ -75,13 +75,13 @@ class TestStateOperations:
     def test_update_existing_state(self):
         """Test POST updates existing state."""
         initial_state = {"version": 4, "resources": []}
-        client.post("/tfstate", json=initial_state)
+        client.post("/state", json=initial_state)
 
         updated_state = {"version": 4, "resources": [{"type": "test"}]}
-        response = client.post("/tfstate", json=updated_state)
+        response = client.post("/state", json=updated_state)
         assert response.status_code == 200
 
-        get_response = client.get("/tfstate")
+        get_response = client.get("/state")
         assert get_response.json() == updated_state
 
     def test_delete_state(self):
@@ -98,7 +98,7 @@ class TestStateOperations:
     def test_post_invalid_json(self):
         """Test POST with invalid JSON returns 400."""
         response = client.post(
-            "/tfstate",
+            "/state",
             content="not valid json",
             headers={"Content-Type": "application/json"}
         )
@@ -129,17 +129,17 @@ class TestLockingOperations:
             "Operation": "OperationTypeApply",
             "Info": "test lock"
         }
-        client.request("LOCK", "/lock", json=lock_data)
+        client.post("/lock", json=lock_data)
 
-        response = client.request("UNLOCK", "/lock", json=lock_data)
+        response = client.delete("/lock", json=lock_data)
         assert response.status_code == 200
 
     def test_lock_already_locked_with_same_id(self):
         """Test locking when already locked with same ID succeeds."""
         lock_data = {"ID": "lock-789", "Operation": "test"}
-        client.request("LOCK", "/lock", json=lock_data)
+        client.post("/lock", json=lock_data)
 
-        response = client.request("LOCK", "/lock", json=lock_data)
+        response = client.post("/lock", json=lock_data)
         assert response.status_code == 200
 
     def test_lock_already_locked_with_different_id(self):
@@ -155,10 +155,10 @@ class TestLockingOperations:
     def test_unlock_with_wrong_id(self):
         """Test unlocking with wrong ID returns 409."""
         lock_data = {"ID": "lock-aaa", "Operation": "test"}
-        client.request("LOCK", "/lock", json=lock_data)
+        client.post("/lock", json=lock_data)
 
         wrong_lock_data = {"ID": "lock-bbb", "Operation": "test"}
-        response = client.request("UNLOCK", "/lock", json=wrong_lock_data)
+        response = client.delete("/lock", json=wrong_lock_data)
         assert response.status_code == 409
 
     def test_unlock_when_not_locked(self):
@@ -174,11 +174,11 @@ class TestStateAndLockInteraction:
     def test_post_state_when_locked_with_wrong_id(self):
         """Test POST state fails when locked with wrong ID."""
         lock_data = {"ID": "lock-correct", "Operation": "test"}
-        client.request("LOCK", "/lock", json=lock_data)
+        client.post("/lock", json=lock_data)
 
         state_data = {"version": 4, "resources": []}
         response = client.post(
-            "/tfstate",
+            "/state",
             json=state_data,
             headers={"Lock-ID": "lock-wrong"}
         )
@@ -201,10 +201,10 @@ class TestStateAndLockInteraction:
     def test_post_state_when_locked_without_lock_id_header(self):
         """Test POST state fails when locked but no Lock-ID header."""
         lock_data = {"ID": "lock-123", "Operation": "test"}
-        client.request("LOCK", "/lock", json=lock_data)
+        client.post("/lock", json=lock_data)
 
         state_data = {"version": 4, "resources": []}
-        response = client.post("/tfstate", json=state_data)
+        response = client.post("/state", json=state_data)
         assert response.status_code == 409
 
     def test_delete_state_when_locked_with_wrong_id(self):

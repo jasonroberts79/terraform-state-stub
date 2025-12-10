@@ -63,7 +63,7 @@ load_state()
 load_lock()
 
 
-@app.get("/tfstate")
+@app.api_route("/state", methods=["GET"])
 async def get_state():
     """
     Retrieve the current Terraform state.
@@ -75,7 +75,7 @@ async def get_state():
     return JSONResponse(content=state_store)
 
 
-@app.post("/tfstate")
+@app.api_route("/state", methods=["POST"])
 async def update_state(request: Request):
     """
     Update or create the Terraform state.
@@ -103,7 +103,7 @@ async def update_state(request: Request):
     return Response(status_code=200)
 
 
-@app.delete("/tfstate")
+@app.api_route("/state", methods=["DELETE"])
 async def delete_state(request: Request):
     """
     Delete the Terraform state.
@@ -125,7 +125,7 @@ async def delete_state(request: Request):
     return Response(status_code=200)
 
 
-@app.api_route("/lock", methods=["LOCK"])
+@app.api_route("/lock", methods=["POST"])
 async def lock_state(request: Request):
     """
     Lock the Terraform state.
